@@ -34,11 +34,11 @@ export const registerController = async (
     }
 
     /// call the registration service
-    const user = await registerService(username, email, password);
+    const userData = await registerService(username, email, password);
 
     res
       .status(201)
-      .json({ message: "User registered successfully", user: user });
+      .json({ message: "User registered successfully", userData: userData });
   } catch (error: any) {
     res
       .status(500)

@@ -3,11 +3,8 @@ import { Request, Response } from "express";
 import { userRepository } from "../../database/mongo/user/userRepository";
 import { User } from "../../entities/user/User";
 import type { UserResponse } from "./auth.types";
-import { generateJwtToken, verifyToken } from "../../lib/jwt";
-import { UserTokenModel } from "../../database/mongo/token/userToken.schema";
-import { userTokenRepository } from "../../database/mongo/token/tokenRepository";
-
-import { UserId } from "../../entities/user/UserId";
+import { generateAccessToken, generateRefreshToken } from "../../lib/jwt";
+import redisClient from "../../config/redis-connection";
 
 export function userToResponse(user: User): UserResponse {
   return {
@@ -31,7 +28,7 @@ interface loginReturn {
 export const registerService = async (
   username: string,
   email: string,
-  password: string
+  password: string,
 ): Promise<UserResponse> => {
   const existingUsername = await userRepository.findUserByUsername(username);
   if (existingUsername) {
@@ -61,10 +58,9 @@ export const loginService = async (
   email: string,
   password: string,
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<loginReturn | null> => {
-  if (!email || !password)
-    throw new Error("Credentials not received.");
+  if (!email || !password) throw new Error("Credentials not received.");
 
   const user = await userRepository.findUserByEmailWithPassword(email);
 
@@ -79,44 +75,32 @@ export const loginService = async (
     throw new Error("User credentials are invalid!");
   }
 
-  // if user exist, issue the jwt token
-  const token = generateJwtToken({
+  // token payload
+  const payload = {
     userId: user.id.toString(),
     email: user.email,
+  };
+
+  // if user exist, issue the jwt tokens
+  const accessToken = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  // store refresh token in redis
+  redisClient.set(`refresh:${user.id}`, refreshToken, {
+    EX: 7 * 24 * 60 * 60, // Expires in 7 days
   });
 
-  // delete previous token details from database
-  await userTokenRepository.deleteTokenSession(user.id);
-
-  // Clear any existing token cookie
-  res.clearCookie("token");
-
-  // Object.keys(req.cookies).forEach((cookieName) => {
-  //   if (cookieName === "token") {
-  //     res.clearCookie(cookieName);
-  //   }
-  // });
-
-  // Set new token cookie
-  res.cookie("token", token, {
+  /// Send refresh token as HTTP-only cookie
+  res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: false,
+    secure: false, // true in production
     sameSite: "lax",
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
-  const decode = verifyToken(token);
-  console.log(decode);
-
-  // stores token into the session
-  await userTokenRepository.createTokenSession(
-    user.id,
-    token,
-    new Date(Date.now() + 24 * 60 * 60 * 1000) // expire at one day
-  );
 
   return {
     user,
-    token,
-    message: "login successfully!",
+    token: accessToken,
+    message: "Login successful!",
   };
 };
