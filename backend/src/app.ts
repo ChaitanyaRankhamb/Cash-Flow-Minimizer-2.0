@@ -10,9 +10,13 @@ import minimizationRoutes from "./modules/minimization/minimization.route"
 import suggestionRoutes from "./modules/suggestion/suggestion.route"
 import meRoutes from "./modules/me/me.routes"
 import cookieParser from "cookie-parser";
+import client, { redisConnection } from "./config/redis-connection";
 
 // Connect to database before setting up routes (top-level await runs on import)
 await connectDB();
+
+// Connect to redis with node 
+await redisConnection();
 
 const app = express();
 
@@ -28,6 +32,14 @@ app.use(express.json());  // express middleware
 
 app.get("/health", async (req: Request, res: Response) => {
   res.status(200).json({ status: "OK" });
+});
+
+// route to check does redis work well?
+app.get("/redis-test", async (req, res) => {
+  await client.set("testKey", "Hello Chaitanya");
+  const value = await client.get("testKey");
+
+  res.json({ value });
 });
 
 app.use("/users", meRoutes);
