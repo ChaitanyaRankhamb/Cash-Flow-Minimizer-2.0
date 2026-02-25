@@ -1,26 +1,37 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyToken } from "../lib/jwt";
+import { verifyAccessToken } from "../lib/jwt";
+import redisClient from "../config/redis-connection";
+
 
 export interface AuthRequest extends Request {
   userId?: string;
 }
 
-export const authMiddleware = (
+export const authMiddleware = async (
   req: AuthRequest,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
-  const token = req.cookies?.token;
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Unauthorized - No token" });
   }
 
+  const token = authHeader.split(" ")[1];
+
   try {
-    const payload = verifyToken(token as string);
+    const payload = verifyAccessToken(token as string);
 
     if (typeof payload === "string" || !payload.userId) {
       return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    // OPTIONAL: Check if token is blacklisted
+    const isBlacklisted = await redisClient.get(`blacklist:${token}`);
+
+    if (isBlacklisted) {
+      return res.status(401).json({ message: "Token invalidated" });
     }
 
     req.userId = payload.userId;
