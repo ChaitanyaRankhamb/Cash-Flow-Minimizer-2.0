@@ -9,8 +9,9 @@ import balanceRoutes from "./modules/balance/balance.route"
 import minimizationRoutes from "./modules/minimization/minimization.route"
 import suggestionRoutes from "./modules/suggestion/suggestion.route"
 import meRoutes from "./modules/me/me.routes"
+import refreshTokenRoutes from "./modules/token/token.route"
 import cookieParser from "cookie-parser";
-import client, { redisConnection } from "./config/redis-connection";
+import redisClient, { redisConnection } from "./config/redis-connection";
 
 // Connect to database before setting up routes (top-level await runs on import)
 await connectDB();
@@ -36,11 +37,13 @@ app.get("/health", async (req: Request, res: Response) => {
 
 // route to check does redis work well?
 app.get("/redis-test", async (req, res) => {
-  await client.set("testKey", "Hello Chaitanya");
-  const value = await client.get("testKey");
+  await redisClient.set("testKey", "Hello Chaitanya");
+  const value = await redisClient.get("testKey");
 
   res.json({ value });
 });
+
+app.use("/refresh", refreshTokenRoutes);
 
 app.use("/users", meRoutes);
 app.use("/auth", authRoutes);
