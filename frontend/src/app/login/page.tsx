@@ -29,6 +29,7 @@ import {
 import { useForm } from "@tanstack/react-form";
 import { showToast } from "@/lib/authToast";
 import { ArrowRightIcon } from "lucide-react";
+import { useState } from "react";
 
 export default function SignUP() {
   const authSchema = z.object({
@@ -45,6 +46,8 @@ export default function SignUP() {
         "Password must include uppercase, lowercase, number, and special character."
       ),
   });
+
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -86,6 +89,10 @@ export default function SignUP() {
         }
 
         const data = await res.json();
+
+        // set accessToken in state
+        setAccessToken(data.token);
+
         console.log(data);
         showToast(
           "login successful",
