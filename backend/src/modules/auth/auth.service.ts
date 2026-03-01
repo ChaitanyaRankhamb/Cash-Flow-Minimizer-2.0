@@ -5,6 +5,8 @@ import { User } from "../../entities/user/User";
 import type { UserResponse } from "./auth.types";
 import { generateAccessToken, generateRefreshToken } from "../../lib/jwt";
 import redisClient from "../../config/redis-connection";
+import { AuthRequest } from "../../middleware/authMiddleware";
+import { UserId } from "../../entities/user/UserId";
 
 export function userToResponse(user: User): UserResponse {
   return {
@@ -22,6 +24,12 @@ export function userToResponse(user: User): UserResponse {
 interface loginReturn {
   user: User;
   token: string;
+  message: string;
+}
+
+interface logoutReturn {
+  status: number;
+  success: boolean;
   message: string;
 }
 
@@ -102,5 +110,24 @@ export const loginService = async (
     user,
     token: accessToken,
     message: "Login successful!",
+  };
+};
+
+export const logoutService = async (userId: UserId): Promise<logoutReturn> => {
+  // Remove refresh token from Redis
+  const deletedCount = await redisClient.del(`refresh:${userId}`);
+
+  if (deletedCount === 0) {
+    return {
+      status: 200,
+      success: true,
+      message: "Already logged out",
+    };
+  }
+
+  return {
+    status: 200,
+    success: true,
+    message: "User Logged Out Successfully!",
   };
 };
