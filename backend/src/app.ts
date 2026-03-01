@@ -10,6 +10,7 @@ import minimizationRoutes from "./modules/minimization/minimization.route"
 import suggestionRoutes from "./modules/suggestion/suggestion.route"
 import meRoutes from "./modules/me/me.routes"
 import refreshTokenRoutes from "./modules/token/token.route"
+import appDataRoutes from "./modules/appData/routes"
 import cookieParser from "cookie-parser";
 import redisClient, { redisConnection } from "./config/redis-connection";
 
@@ -44,6 +45,9 @@ app.get("/redis-test", async (req, res) => {
 });
 
 app.use("/refresh", refreshTokenRoutes);
+
+// create the routes to get aggregated data for frontend pages
+app.use("/app-data", appDataRoutes);
 
 app.use("/users", meRoutes);
 app.use("/auth", authRoutes);
