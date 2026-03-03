@@ -8,6 +8,8 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ onCreateGroupClick }: PageHeaderProps) {
+
+  
   return (
     <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
       <div className="space-y-2">

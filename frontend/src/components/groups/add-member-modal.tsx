@@ -1,26 +1,29 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { X, Check } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { X, Check } from "lucide-react";
+import { toast } from "sonner";
+import { useAppDataStore } from "@/store/useAppDataStore";
+import { apiFetch } from "@/lib/api";
 
 interface AddMemberModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupName?: string;
+  groupId?: string;
   onMemberAdd?: (email: string) => void;
 }
 
@@ -30,56 +33,107 @@ const isValidEmail = (email: string): boolean => {
 };
 
 const getInitials = (email: string): string => {
-  const [localPart] = email.split('@');
-  const parts = localPart.split('.');
-  if (parts.length > 1) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return localPart.substring(0, 2).toUpperCase();
+  return email[0].toUpperCase();
 };
 
 export function AddMemberModal({
   open,
   onOpenChange,
   groupName,
+  groupId,
   onMemberAdd,
 }: AddMemberModalProps) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isValid, setIsValid] = useState(false);
   const [userExists, setUserExists] = useState(false);
+  const [previewUser, setPreviewUser] = useState<{
+    username: string;
+    profileImageUrl?: string | null;
+  } | null>(null);
+
+  const appData = useAppDataStore((s) => s.appData);
+  const groupData = appData?.groups.groups;
 
   useEffect(() => {
     const valid = isValidEmail(email);
     setIsValid(valid);
-    
-    // Simulate checking if user exists
-    if (valid) {
-      setUserExists(Math.random() > 0.5);
+
+    if (valid && appData) {
+      // try to match local part of email with any known username in groups
+      const local = email.split("@")[0].toLowerCase();
+      let found: typeof previewUser = null;
+      for (const g of appData.groups.groups) {
+        const m = g.members.find((m) => m.username.toLowerCase() === local);
+        if (m) {
+          found = { username: m.username, profileImageUrl: m.profileImageUrl };
+          break;
+        }
+      }
+      setUserExists(!!found);
+      setPreviewUser(found);
+    } else {
+      setUserExists(false);
+      setPreviewUser(null);
     }
-  }, [email]);
+  }, [email, appData]);
 
   const handleAddMember = async () => {
     if (!isValid) {
-      toast.error('Please enter a valid email address');
+      setError("Please enter a valid email address");
       return;
     }
 
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    // Simulate API call
-    setTimeout(() => {
-      onMemberAdd?.(email);
-      toast.success('Member added successfully');
-      setEmail('');
-      setIsLoading(false);
+      const res = await apiFetch(
+        `http://localhost:4000/groups/${groupId}/members`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+          }),
+        },
+      );
+
+      let result;
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error("Invalid server response");
+      }
+
+      if (!res.ok) {
+        throw new Error(result?.message || "Failed to add member");
+      }
+
+      onMemberAdd?.(result.data);
+
+      toast.success("Member added successfully");
+
+      setEmail("");
       onOpenChange(false);
-    }, 600);
+    } catch (err: any) {
+      if (err.name === "TypeError") {
+        setError("Unable to connect to server. Please try again.");
+      } else {
+        setError(err.message || "Something went wrong");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setEmail('');
+      setEmail("");
+      setError(null)
     }
     onOpenChange(newOpen);
   };
@@ -96,22 +150,20 @@ export function AddMemberModal({
               Add Member
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
-              Invite someone to {groupName ? `"${groupName}"` : 'this group'} using their email
+              Invite someone to {groupName ? `"${groupName}"` : "this group"}{" "}
+              using their email
             </DialogDescription>
           </div>
-          {/* <button
-            onClick={() => handleOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button> */}
         </div>
 
         {/* Form */}
         <div className="space-y-5">
           {/* Email Input */}
           <div className="space-y-2">
-            <Label htmlFor="member-email" className="text-sm font-medium text-foreground">
+            <Label
+              htmlFor="member-email"
+              className="text-sm font-medium text-foreground"
+            >
               Member Email <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -122,15 +174,17 @@ export function AddMemberModal({
               onChange={(e) => setEmail(e.target.value)}
               className={`rounded-lg border-border bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:transition-all ${
                 email && isValid
-                  ? 'focus:ring-2 focus:ring-success/30 focus:border-success border-success/50'
+                  ? "focus:ring-2 focus:ring-success/30 focus:border-success border-success/50"
                   : email && !isValid
-                  ? 'focus:ring-2 focus:ring-destructive/30 focus:border-destructive border-destructive/50'
-                  : 'focus:ring-2 focus:ring-primary/30 focus:border-primary'
+                    ? "focus:ring-2 focus:ring-destructive/30 focus:border-destructive border-destructive/50"
+                    : "focus:ring-2 focus:ring-primary/30 focus:border-primary"
               }`}
               disabled={isLoading}
             />
             {email && !isValid && (
-              <p className="text-xs text-destructive font-medium">Invalid email address</p>
+              <p className="text-xs text-destructive font-medium">
+                Invalid email address
+              </p>
             )}
             {email && isValid && (
               <p className="text-xs text-success font-medium flex items-center gap-1">
@@ -138,7 +192,7 @@ export function AddMemberModal({
               </p>
             )}
             <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-              They will receive an invitation to join this group.
+              Only Group Admin has Authority to join members.
             </p>
           </div>
 
@@ -147,23 +201,50 @@ export function AddMemberModal({
             <Card className="p-4 bg-secondary/30 border-border/50 space-y-3 animate-in fade-in duration-200">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 bg-primary/10">
+                  {previewUser?.profileImageUrl && (
+                    <AvatarImage
+                      src={previewUser.profileImageUrl}
+                      alt={previewUser.username}
+                    />
+                  )}
                   <AvatarFallback className="bg-primary/15 text-primary font-semibold text-sm">
-                    {getInitials(email)}
+                    {previewUser
+                      ? previewUser.username
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                      : getInitials(email)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{email}</p>
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {previewUser?.username || email}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    {userExists ? 'User Found' : 'Will be invited'}
+                    {userExists ? "User Found" : "Will be joined"}
                   </p>
                 </div>
-                <Badge className={userExists ? 'bg-success/20 text-success' : 'bg-primary/20 text-primary'}>
-                  {userExists ? 'Found' : 'New'}
+                <Badge
+                  className={
+                    userExists
+                      ? "bg-success/20 text-success"
+                      : "bg-primary/20 text-primary"
+                  }
+                >
+                  {userExists ? "Found" : "New"}
                 </Badge>
               </div>
             </Card>
           )}
         </div>
+
+        {/* Error area */}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         {/* Footer Buttons */}
         <div className="flex gap-3 pt-4">
@@ -186,7 +267,7 @@ export function AddMemberModal({
                 Adding…
               </div>
             ) : (
-              'Add Member'
+              "Add Member"
             )}
           </Button>
         </div>

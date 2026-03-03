@@ -1,20 +1,22 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { X, Shield } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { X, Shield } from "lucide-react";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
+import { apiFetch } from "@/lib/api";
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -27,33 +29,67 @@ export function CreateGroupModal({
   onOpenChange,
   onGroupCreate,
 }: CreateGroupModalProps) {
-  const [groupName, setGroupName] = useState('');
-  const [description, setDescription] = useState('');
+  const [groupName, setGroupName] = useState("");
+  const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
-      toast.error('Please enter a group name');
+      setError("Group name is required");
       return;
     }
 
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      onGroupCreate?.({ name: groupName, description });
-      toast.success('Group created successfully');
-      setGroupName('');
-      setDescription('');
-      setIsLoading(false);
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const res = await apiFetch("http://localhost:4000/groups", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: groupName.trim(),
+          description: description.trim(),
+        }),
+      });
+
+      let result: any = null;
+
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error("Invalid server response");
+      }
+
+      if (!res.ok) {
+        // Prefer backend message
+        throw new Error(result?.message || "Failed to create group");
+      }
+
+      onGroupCreate?.(result.data);
+
+      setGroupName("");
+      setDescription("");
       onOpenChange(false);
-    }, 600);
+    } catch (err: any) {
+      if (err.name === "TypeError") {
+        // Network failure
+        setError("Unable to connect to server. Please try again.");
+      } else {
+        setError(err.message || "Something went wrong");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setGroupName('');
-      setDescription('');
+      setGroupName("");
+      setDescription("");
+      setError(null);
     }
     onOpenChange(newOpen);
   };
@@ -71,19 +107,16 @@ export function CreateGroupModal({
               Start tracking shared expenses with your friends or team
             </DialogDescription>
           </div>
-          {/* <button
-            onClick={() => handleOpenChange(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button> */}
         </div>
 
         {/* Form */}
         <div className="space-y-5">
           {/* Group Name */}
           <div className="space-y-2">
-            <Label htmlFor="group-name" className="text-sm font-medium text-foreground">
+            <Label
+              htmlFor="group-name"
+              className="text-sm font-medium text-foreground"
+            >
               Group Name <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -91,19 +124,28 @@ export function CreateGroupModal({
               type="text"
               placeholder="Trip to Goa, Flat Expenses, etc."
               value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
+              onChange={(e) => {
+                setGroupName(e.target.value);
+                setError(null);
+              }}
               className="rounded-lg border-border bg-background px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
               disabled={isLoading}
             />
-            {!groupName.trim() && groupName !== '' && (
-              <p className="text-xs text-destructive font-medium">Group name is required</p>
+            {!groupName.trim() && groupName !== "" && (
+              <p className="text-xs text-destructive font-medium">
+                Group name is required
+              </p>
             )}
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-medium text-foreground">
-              Description <span className="text-muted-foreground">(Optional)</span>
+            <Label
+              htmlFor="description"
+              className="text-sm font-medium text-foreground"
+            >
+              Description{" "}
+              <span className="text-muted-foreground">(Optional)</span>
             </Label>
             <Textarea
               id="description"
@@ -124,6 +166,13 @@ export function CreateGroupModal({
             </p>
           </Card>
         </div>
+
+        {/* Error area */}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         {/* Footer Buttons */}
         <div className="flex gap-3 pt-4">
@@ -146,7 +195,7 @@ export function CreateGroupModal({
                 Creating…
               </div>
             ) : (
-              'Create Group'
+              "Create Group"
             )}
           </Button>
         </div>

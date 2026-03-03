@@ -1,96 +1,143 @@
-'use client';
+"use client";
 
-import { GroupCard } from './group-card';
+import { useAppDataStore } from "@/store/useAppDataStore";
+import { GroupCard } from "./group-card";
 
-const MOCK_GROUPS = [
-  {
-    id: '1',
-    name: 'Weekend Trip',
-    status: 'active' as const,
-    totalExpenses: 1240,
-    yourBalance: 320,
-    lastActivity: 'Updated 2 hours ago',
-    members: [
-      { name: 'Sarah', avatar: '', initials: 'SA' },
-      { name: 'Mike', avatar: '', initials: 'MI' },
-      { name: 'Emma', avatar: '', initials: 'EM' },
-      { name: 'John', avatar: '', initials: 'JO' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Office Lunch Fund',
-    status: 'active' as const,
-    totalExpenses: 580,
-    yourBalance: -150,
-    lastActivity: 'Updated 1 day ago',
-    members: [
-      { name: 'Alex', avatar: '', initials: 'AL' },
-      { name: 'Jamie', avatar: '', initials: 'JA' },
-      { name: 'Casey', avatar: '', initials: 'CA' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Annual Retreat',
-    status: 'settled' as const,
-    totalExpenses: 3200,
-    yourBalance: 0,
-    lastActivity: 'Updated 5 days ago',
-    members: [
-      { name: 'Tom', avatar: '', initials: 'TO' },
-      { name: 'Lisa', avatar: '', initials: 'LI' },
-      { name: 'David', avatar: '', initials: 'DA' },
-      { name: 'Rachel', avatar: '', initials: 'RA' },
-      { name: 'Chris', avatar: '', initials: 'CH' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Roommate Rent Split',
-    status: 'active' as const,
-    totalExpenses: 2400,
-    yourBalance: 600,
-    lastActivity: 'Updated 3 hours ago',
-    members: [
-      { name: 'Jordan', avatar: '', initials: 'JO' },
-      { name: 'Taylor', avatar: '', initials: 'TA' },
-    ],
-  },
-  {
-    id: '5',
-    name: 'Holiday Party Donations',
-    status: 'active' as const,
-    totalExpenses: 850,
-    yourBalance: -200,
-    lastActivity: 'Updated 8 hours ago',
-    members: [
-      { name: 'Nicole', avatar: '', initials: 'NI' },
-      { name: 'Marcus', avatar: '', initials: 'MA' },
-      { name: 'Sophie', avatar: '', initials: 'SO' },
-      { name: 'Ethan', avatar: '', initials: 'ET' },
-    ],
-  },
-  {
-    id: '6',
-    name: 'Birthday Celebration',
-    status: 'settled' as const,
-    totalExpenses: 420,
-    yourBalance: 0,
-    lastActivity: 'Updated 2 weeks ago',
-    members: [
-      { name: 'Grace', avatar: '', initials: 'GR' },
-      { name: 'Derek', avatar: '', initials: 'DE' },
-      { name: 'Lauren', avatar: '', initials: 'LA' },
-    ],
-  },
-];
+/* =========================
+   Types From Store
+========================= */
+
+export interface StoreGroup {
+  id: string;
+  groupName: string;
+  // track possible values coming from backend; UI treats "balanced" same as settled
+  groupStatus: "active" | "balanced" | "settled" | "archived";
+  members: {
+    userId: string;
+    username: string;
+    profileImageUrl?: string | null;
+  }[];
+  overview: {
+    totalExpensesAmount: number;
+    yourNetBalance: number;
+    recentTransctionList: {
+      timeOfpaid: string; // ISO string
+      transactionName: string;
+      amount: number;
+    }[];
+  };
+  expenses: {
+    expensesList: {
+      id: string;
+      nameOfExpense: string;
+      paidByUserId: string;
+      totalAmount: number;
+      createdAt: string;
+      splits: {
+        userId: string;
+        share: number;
+      }[];
+    }[];
+  };
+  suggestions: {
+    listOfSuggestions: {
+      id: string;
+      fromUserId: string;
+      toUserId: string;
+      amount: number;
+      creditedAt: string; // ISO string
+      status: "pending" | "settled";
+    }[];
+  };
+}
+
+/* =========================
+   Component
+========================= */
 
 export function GroupsGrid() {
+  const appData = useAppDataStore((s) => s.appData);
+  const loading = useAppDataStore((s) => s.loading);
+  const error = useAppDataStore((s) => s.error);
+
+  // convert raw appData pods into our simplified StoreGroup shape
+  const groupData: StoreGroup[] =
+    appData?.groups?.groups.map((g) => ({
+      id: g.id,
+      groupName: g.groupName,
+      groupStatus: g.groupStatus as StoreGroup["groupStatus"],
+      members: g.members,
+      overview: g.overview,
+      expenses: g.expenses,
+      suggestions: g.suggestions ?? { listOfSuggestions: [] },
+    })) || [];
+
+  /* ========= Loading ========= */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-muted-foreground">
+        Loading groups...
+      </div>
+    );
+  }
+
+  /* ========= Error ========= */
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-red-500 font-medium">Failed to load groups</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Please try again later.
+        </p>
+      </div>
+    );
+  }
+
+  /* ========= Empty ========= */
+  if (!groupData.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-lg font-medium text-foreground">No Groups Found</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Create a group to start tracking expenses.
+        </p>
+      </div>
+    );
+  }
+
+  /* ========= Transform Store Data → GroupCardProps ========= */
+
+  const transformedGroups = groupData.map((group) => {
+    const recentList = group.overview.recentTransctionList;
+
+    return {
+      name: group.groupName,
+      status: group.groupStatus,
+      totalExpenses: group.overview.totalExpensesAmount,
+      yourBalance: group.overview.yourNetBalance,
+      lastActivity:
+        recentList && recentList.length > 0
+          ? `Updated ${new Date(recentList[0].timeOfpaid).toLocaleDateString()}`
+          : "No recent activity",
+      members: group.members.map((member) => ({
+        name: member.username,
+        avatar: member.profileImageUrl || "",
+        initials: member.username
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase(),
+      })),
+      groupData: group,
+    };
+  });
+
+  /* ========= Success ========= */
+
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {MOCK_GROUPS.map((group) => (
-        <GroupCard key={group.id} {...group} />
+      {transformedGroups.map((group) => (
+        <GroupCard key={group.name} {...group} />
       ))}
     </div>
   );
