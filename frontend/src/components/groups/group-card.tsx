@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 import { UpdateGroupModal } from "./update-group-model";
+import { DeleteGroupModal } from "./delete-group-model";
 
 interface GroupCardProps {
   name: string;
@@ -189,6 +190,7 @@ export function GroupCard({
                 onClick={(e) => {
                   e.stopPropagation();
                   // delete logic
+                  setShowDeleteGroup(true);
                 }}
               >
                 <Trash className="mr-2 h-4 w-4 text-destructive" />
@@ -228,13 +230,22 @@ export function GroupCard({
         />
       )}
 
-      {/* Delete Group Model */}
+      {/* Update Group Model */}
       <UpdateGroupModal 
       open={showUpdateGroup}
       onOpenChange={setShowUpdateGroup}
       groupId={groupData.id}
       initialName={groupData.groupName}
       initialDescription={groupData.description}
+      />
+
+      {/* Delete Group Model  */}
+      <DeleteGroupModal 
+      open={showDeleteGroup}
+      onOpenChange={setShowDeleteGroup}
+      groupName={groupData.groupName}
+      groupId={groupData.id}
+      groupStatus={groupData.groupStatus}
       />
     </>
   );
