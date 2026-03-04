@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { useGroups } from "@/context/GroupContext";
-import { useSuggestions } from "@/context/SuggestionContext";
-import { useUser } from "@/context/UserContext";
-import { useNetBalances } from "@/context/netBalance.Context";
+import { useAppDataStore } from "@/store/useAppDataStore";
 
 interface ChartItem {
   name: string;
@@ -27,53 +24,66 @@ function getColorFromClass(className: string) {
 }
 
 export function CircularProgressCard() {
+  const appData = useAppDataStore((state) => state.appData);
+  const loading = useAppDataStore((state) => state.loading);
+  const error = useAppDataStore((state) => state.error);
+
+  const activeDebtStatus = appData?.dashboard?.debtStatus;
+
   const [data, setData] = useState<ChartItem[]>([]);
-  const { groups } = useGroups();
-  const { netBalances } = useNetBalances();
-  const { user } = useUser();
-
-  // group data
-  const totalGroups = groups.length;
-  let totalActiveGroups = 0;
-
-  for (const group of groups) {
-    if (group.isActive) {
-      totalActiveGroups++;
-    }
-  }
-
-  // net balance data
-  let totalOwed: number = 0;
-  let totalOwe: number = 0;
-
-  const currentUserId = user?.id;
-
-  for (const netBalance of netBalances) {
-    if (!currentUserId) continue;
-    if (netBalance.userId.value !== currentUserId) continue;
-
-    if (netBalance.role === "CREDITOR") {
-      totalOwed += netBalance.netBalance;
-    } else if (netBalance.role === "DEBTOR") {
-      totalOwe += Math.abs(netBalance.netBalance);
-    } 
-  }
-
-  const totalActiveAmount: number = totalOwed + totalOwe;
-
-
 
   useEffect(() => {
+    if (!activeDebtStatus) return;
+
     const success = getColorFromClass("bg-success");
     const destructive = getColorFromClass("bg-destructive");
     const neutral = getColorFromClass("bg-chart-3");
 
     setData([
-      { name: "You are owed", value: totalOwed, color: success },
-      { name: "You owe", value: totalOwe, color: destructive },
-      { name: "Balanced groups", value: 2100, color: neutral },
+      {
+        name: "You are owed",
+        value: activeDebtStatus.youAreOwed ?? 0,
+        color: success,
+      },
+      {
+        name: "You owe",
+        value: activeDebtStatus.youOwe ?? 0,
+        color: destructive,
+      },
+      {
+        name: "Balanced groups",
+        value: activeDebtStatus.balancedGroups ?? 0,
+        color: neutral,
+      },
     ]);
-  }, []);
+  }, [activeDebtStatus]);
+
+  const totalAmount = activeDebtStatus?.totalActiveDebtAmount ?? 0;
+  const totalGroups = activeDebtStatus?.totalActiveGroups ?? 0;
+  const joinedGroups =
+    appData?.dashboard?.globalFinancialOverview?.totalGroupsJoined ?? 0;
+
+  // 🔥 LOADING STATE
+  if (loading) {
+    return (
+      <Card className="bg-card border border-border rounded-2xl p-6 h-full flex items-center justify-center">
+        <p className="text-muted-foreground text-sm animate-pulse">
+          Loading Active Debt Status...
+        </p>
+      </Card>
+    );
+  }
+
+  // // 🔥 ERROR STATE
+  // if (error) {
+  //   return (
+  //     <Card className="bg-card border border-destructive rounded-2xl p-6 h-full flex items-center justify-center">
+  //       <p className="text-destructive text-sm">
+  //         Failed to load dashboard data.
+  //       </p>
+  //     </Card>
+  //   );
+  // }
 
   return (
     <Card className="bg-card border border-border rounded-2xl p-6 h-full transition-all duration-300 hover:shadow-md">
@@ -110,10 +120,10 @@ export function CircularProgressCard() {
               Total Active Amount
             </p>
             <p className="text-2xl font-semibold tracking-tight text-foreground">
-              ₹ {totalActiveAmount.toFixed(2)}
+              ₹ {totalAmount.toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {totalActiveGroups} / {totalGroups} Groups Active
+              {totalGroups} / {joinedGroups} Groups Active
             </p>
           </div>
 
@@ -125,9 +135,8 @@ export function CircularProgressCard() {
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="text-xs text-muted-foreground">
-                  {item.name} { item.value }
+                  {item.name} ₹ {item.value}
                 </span>
-                
               </div>
             ))}
           </div>

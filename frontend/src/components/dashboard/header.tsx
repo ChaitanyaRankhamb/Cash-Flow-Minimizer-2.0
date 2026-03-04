@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Moon, Sun, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +9,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
-import UserFetch, { UserDTO } from "@/lib/api/userFetch";
-import { useUser } from "@/context/UserContext";
+import { useAppDataStore } from "@/store/useAppDataStore";
 
 export function Header() {
   const { setTheme } = useTheme();
-  const { user } = useUser();
+
+  const appData = useAppDataStore((s) => s.appData);
+  const loading = useAppDataStore((s) => s.loading);
+  const error = useAppDataStore((s) => s.error);
+
+  const userData = appData?.dashboard.user;
 
   return (
     <header className="bg-card border-b border-border backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -24,7 +27,7 @@ export function Header() {
         {/* Left Section */}
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-primary">
-            Welcome back, {user?.username ?? "User"}
+            Welcome back, {userData?.username ?? "User"}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             Optimize. Settle. Simplify.

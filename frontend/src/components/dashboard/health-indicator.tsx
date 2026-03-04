@@ -1,10 +1,19 @@
 'use client'
 
 import { Card } from '@/components/ui/card'
+import { useAppDataStore } from '@/store/useAppDataStore'
 import { TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export function HealthIndicatorCard() {
-  const netPosition = 2400
+  const appData = useAppDataStore((s) => s.appData)
+  const loading = useAppDataStore((s) => s.loading)
+  const error = useAppDataStore((s) => s.error)
+
+  if (loading) return <Card className="p-6">Loading...</Card>
+  // if (error) return <Card className="p-6 text-destructive">{error}</Card>
+  if (!appData) return null
+
+  const netPosition = appData.dashboard?.debtStatus?.netPosition ?? 0
 
   const getStatus = () => {
     if (netPosition > 0) {
@@ -17,7 +26,7 @@ export function HealthIndicatorCard() {
       }
     } else if (netPosition < 0) {
       return {
-        title: 'Attention – You owe overall',
+        title: 'Attention – You are a debtor',
         textColor: 'text-destructive',
         iconColor: 'text-destructive',
         iconBg: 'bg-destructive/10',
@@ -39,15 +48,12 @@ export function HealthIndicatorCard() {
 
   return (
     <Card className="bg-card border border-border rounded-2xl p-6 transition-all duration-300 hover:shadow-md">
-
       <div className="flex items-center gap-4">
 
-        {/* Icon */}
         <div className={`p-3 rounded-xl ${status.iconBg}`}>
           <StatusIcon className={`h-6 w-6 ${status.iconColor}`} />
         </div>
 
-        {/* Content */}
         <div className="flex-1">
           <h3 className={`text-base font-semibold tracking-tight ${status.textColor}`}>
             {status.title}
@@ -55,15 +61,14 @@ export function HealthIndicatorCard() {
 
           <p className="text-sm text-muted-foreground mt-1">
             {netPosition > 0
-              ? `You are owed ₹${Math.abs(netPosition / 100).toFixed(2)} overall`
+              ? `You are owed ₹${Math.abs(netPosition).toFixed(2)} overall`
               : netPosition < 0
-              ? `You owe ₹${Math.abs(netPosition / 100).toFixed(2)} overall`
+              ? `You owe ₹${Math.abs(netPosition).toFixed(2)} overall`
               : 'All debts are settled'}
           </p>
         </div>
 
       </div>
-
     </Card>
   )
 }

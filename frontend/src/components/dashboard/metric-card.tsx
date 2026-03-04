@@ -6,6 +6,7 @@ interface MetricCardProps {
   label: string;
   value: string | number;
   subtitle?: string;
+  onClick: () => void;
 }
 
 export function MetricCard({
@@ -13,9 +14,11 @@ export function MetricCard({
   label,
   value,
   subtitle,
+  onClick,
 }: MetricCardProps) {
   return (
     <Card
+    onClick={onClick}
       className="
         group relative 
         bg-card 
