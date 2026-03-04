@@ -13,6 +13,7 @@ export interface StoreGroup {
   description: string;
   // track possible values coming from backend; UI treats "balanced" same as settled
   groupStatus: "active" | "balanced" | "settled" | "archived";
+  createdAt: Date;
   members: {
     userId: string;
     username: string;
@@ -68,6 +69,7 @@ export function GroupsGrid() {
       groupName: g.groupName,
       description: g.description,
       groupStatus: g.groupStatus as StoreGroup["groupStatus"],
+      createdAt: g.createdAt,
       members: g.members,
       overview: g.overview,
       expenses: g.expenses,
@@ -118,10 +120,7 @@ export function GroupsGrid() {
       status: group.groupStatus,
       totalExpenses: group.overview.totalExpensesAmount,
       yourBalance: group.overview.yourNetBalance,
-      lastActivity:
-        recentList && recentList.length > 0
-          ? `Updated ${new Date(recentList[0].timeOfpaid).toLocaleDateString()}`
-          : "No recent activity",
+      createdAt: group.createdAt,
       members: group.members.map((member) => ({
         name: member.username,
         avatar: member.profileImageUrl || "",

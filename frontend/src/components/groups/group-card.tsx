@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { MoreVertical, Pencil, Trash, Eye } from "lucide-react";
+import { UpdateGroupModal } from "./update-group-model";
 
 interface GroupCardProps {
   name: string;
@@ -28,7 +29,7 @@ interface GroupCardProps {
   status: "active" | "balanced" | "settled" | "archived";
   totalExpenses: number;
   yourBalance: number;
-  lastActivity: string;
+  createdAt: Date;
   members: Array<{
     name: string;
     avatar: string;
@@ -43,13 +44,15 @@ export function GroupCard({
   status,
   totalExpenses,
   yourBalance,
-  lastActivity,
+  createdAt,
   members,
   groupData,
 }: GroupCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showDeleteGroup, setShowDeleteGroup] = useState(false);
+  const [showUpdateGroup, setShowUpdateGroup] = useState(false);
 
   /* -----------------------------
      Status Styling
@@ -82,20 +85,6 @@ export function GroupCard({
     if (yourBalance < 0) return "text-destructive font-semibold";
     return "text-muted-foreground";
   };
-
-  /* -----------------------------
-     Format Last Activity
-  ------------------------------*/
-  const formattedLastActivity = useMemo(() => {
-    if (!lastActivity) return "No recent activity";
-
-    const date = new Date(lastActivity);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }, [lastActivity]);
 
   return (
     <>
@@ -163,7 +152,7 @@ export function GroupCard({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-secondary/30">
           <span className="text-xs text-muted-foreground">
-            {formattedLastActivity}
+            {"Date: "} {createdAt.toString().split("T")[0]}
           </span>
 
           <DropdownMenu onOpenChange={setShowMoreOptions}>
@@ -189,6 +178,7 @@ export function GroupCard({
                 onClick={(e) => {
                   e.stopPropagation();
                   // update logic
+                  setShowUpdateGroup(true);
                 }}
               >
                 <Pencil className="mr-2 h-4 w-4 text-primary" />
@@ -237,6 +227,15 @@ export function GroupCard({
           groupId={groupData.id}
         />
       )}
+
+      {/* Delete Group Model */}
+      <UpdateGroupModal 
+      open={showUpdateGroup}
+      onOpenChange={setShowUpdateGroup}
+      groupId={groupData.id}
+      initialName={groupData.groupName}
+      initialDescription={groupData.description}
+      />
     </>
   );
 }
