@@ -9,6 +9,18 @@ import { useState, useMemo } from "react";
 import { GroupDetailsPanel } from "./group-details-panel";
 import { AddMemberModal } from "./add-member-modal";
 import { StoreGroup } from "./groups-grid";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 
 interface GroupCardProps {
   name: string;
@@ -35,6 +47,7 @@ export function GroupCard({
 }: GroupCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   /* -----------------------------
      Status Styling
@@ -148,18 +161,56 @@ export function GroupCard({
             {formattedLastActivity}
           </span>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1 text-primary hover:bg-primary/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDetails(true);
-            }}
-          >
-            View Details
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <DropdownMenu onOpenChange={setShowMoreOptions}>
+            <Tooltip open={showMoreOptions ? false : undefined}>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:bg-primary/10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+
+              <TooltipContent side="left">More options</TooltipContent>
+            </Tooltip>
+
+            <DropdownMenuContent side="left" align="end" className="w-40">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // update logic
+                }}
+              >
+                <Pencil className="mr-2 h-4 w-4 text-primary" />
+                Update
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // delete logic
+                }}
+              >
+                <Trash className="mr-2 h-4 w-4 text-destructive" />
+                Delete
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDetails(true);
+                }}
+              >
+                <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                View Details
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Card>
 
@@ -178,7 +229,7 @@ export function GroupCard({
           open={showAddMember}
           onOpenChange={setShowAddMember}
           groupName={groupData.groupName}
-          groupId={groupData.id} 
+          groupId={groupData.id}
         />
       )}
     </>
