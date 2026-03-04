@@ -17,6 +17,7 @@ import { X, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiFetch } from "@/lib/api";
+import { useAppDataStore } from "@/store/useAppDataStore";
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -66,6 +67,18 @@ export function CreateGroupModal({
       if (!res.ok) {
         // Prefer backend message
         throw new Error(result?.message || "Failed to create group");
+      }
+
+      // refresh app data like expense does
+      const refresh = await apiFetch("http://localhost:4000/app-data", {
+        method: "GET",
+      });
+
+      const json = await refresh.json();
+
+      if (refresh.ok && json.success) {
+        const setAppData = useAppDataStore.getState().setAppData;
+        setAppData(json.data);
       }
 
       onGroupCreate?.(result.data);

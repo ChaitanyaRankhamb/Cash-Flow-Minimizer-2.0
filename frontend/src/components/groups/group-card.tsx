@@ -24,6 +24,7 @@ import { MoreVertical, Pencil, Trash, Eye } from "lucide-react";
 
 interface GroupCardProps {
   name: string;
+  description: string;
   status: "active" | "balanced" | "settled" | "archived";
   totalExpenses: number;
   yourBalance: number;
@@ -38,6 +39,7 @@ interface GroupCardProps {
 
 export function GroupCard({
   name,
+  description,
   status,
   totalExpenses,
   yourBalance,
@@ -103,10 +105,13 @@ export function GroupCard({
       >
         {/* Header */}
         <div className="flex items-start justify-between p-6 pb-4">
-          <div className="flex-1">
+          <div className="flex-1 flex-col">
             <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
               {name}
             </h3>
+            <p className=" text-sm font-normal text-card-foreground opacity-50 mt-2 h-5">
+              {description ?? ""}
+            </p>
           </div>
           <Badge className={`ml-2 ${getStatusColor()}`}>
             {status.charAt(0).toUpperCase() + status.slice(1)}

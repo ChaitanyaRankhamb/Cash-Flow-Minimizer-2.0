@@ -10,6 +10,7 @@ import { GroupCard } from "./group-card";
 export interface StoreGroup {
   id: string;
   groupName: string;
+  description: string;
   // track possible values coming from backend; UI treats "balanced" same as settled
   groupStatus: "active" | "balanced" | "settled" | "archived";
   members: {
@@ -65,6 +66,7 @@ export function GroupsGrid() {
     appData?.groups?.groups.map((g) => ({
       id: g.id,
       groupName: g.groupName,
+      description: g.description,
       groupStatus: g.groupStatus as StoreGroup["groupStatus"],
       members: g.members,
       overview: g.overview,
@@ -112,6 +114,7 @@ export function GroupsGrid() {
 
     return {
       name: group.groupName,
+      description: group.description,
       status: group.groupStatus,
       totalExpenses: group.overview.totalExpensesAmount,
       yourBalance: group.overview.yourNetBalance,
