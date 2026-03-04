@@ -1,6 +1,9 @@
-import { Request, Response } from "express";
-import { updateGroupService } from "../../services/groupService";
+import { AuthRequest } from './../../../../middleware/authMiddleware';
+import { Response, Request } from "express";
+import { AppError } from "../../../../errors/appError";
 import { GroupId } from "../../../../entities/group/GroupId";
+import { updateGroupService } from "../../services/GroupServices/updateGroupService";
+import { UserId } from '../../../../entities/user/UserId';
 
 interface UpdateGroupBody {
   name?: string;
@@ -8,23 +11,28 @@ interface UpdateGroupBody {
 }
 
 export const updateGroupController = async (
-  req: Request<{ groupId: string }, {}, UpdateGroupBody>,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
-    const { groupId } = req.params;
-    const { name, description } = req.body;
+    const { groupId } = req.params ?? {};
+    const { name, description } = req.body ?? {};
+    const userId = req.userId;
 
-    if (!groupId) {
+    if (!groupId || !userId) {
       res.status(400).json({
-        message: "Missing required parameter: groupId",
+        success: false,
+        message: "Missing required fields",
+        code: "REQUIRED_FIELDS",
       });
       return;
     }
 
     if (!name && !description) {
       res.status(400).json({
+        success: false,
         message: "Nothing to update. Provide name or description",
+        code: "NOTHING_TO_UPDATE",
       });
       return;
     }
@@ -34,35 +42,33 @@ export const updateGroupController = async (
     if (description !== undefined) payload.description = description;
 
     const updatedGroup = await updateGroupService(
-      new GroupId(groupId),
-      payload
+      new UserId(userId),
+      new GroupId(groupId.toString()),
+      payload,
     );
 
     res.status(200).json({
+      success: true,
       message: "Group updated successfully",
-      group: updatedGroup,
+      data: updatedGroup,
     });
+
   } catch (error: any) {
-    console.error("Update Group Error:", error);
+    console.error("UpdateGroupController Error:", error);
 
-    const message = error.message?.toLowerCase() || "";
-
-    if (message.includes("not found")) {
-      res.status(404).json({ message: error.message });
-      return;
-    }
-
-    if (
-      message.includes("forbidden") ||
-      message.includes("not authorized")
-    ) {
-      res.status(403).json({ message: error.message });
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
       return;
     }
 
     res.status(500).json({
+      success: false,
       message: "Internal Server Error",
-      error: error.message,
+      code: "INTERNAL_SERVER_ERROR",
     });
   }
 };

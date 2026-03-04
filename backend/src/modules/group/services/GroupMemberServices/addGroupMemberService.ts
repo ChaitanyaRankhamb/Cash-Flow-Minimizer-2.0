@@ -2,39 +2,49 @@ import { groupRepository } from "../../../../database/mongo/group/groupRepositor
 import { userRepository } from "../../../../database/mongo/user/userRepository";
 import { GroupId } from "../../../../entities/group/GroupId";
 import { GroupMember, GroupRole } from "../../../../entities/group/GroupMember";
-import { UserId } from "../../../../entities/user/UserId";
+import { AppError } from "../../../../errors/appError";
 
 export const addGroupMemberService = async (
   groupId: string,
-  userId: string,
+  email: string,
   role?: GroupRole | string
-): Promise<GroupMember | null> => {
-  // does a group exist with groupId
-  const group = await groupRepository.exists(new GroupId(groupId));
+): Promise<GroupMember> => {
+  const groupExists = await groupRepository.exists(new GroupId(groupId));
 
-  if (!group) {
-    throw new Error("Group not Found!");
+  if (!groupExists) {
+    throw new AppError(
+      "Group not found",
+      404,
+      "GROUP_NOT_FOUND"
+    );
   }
 
-  const user = await userRepository.findUserByID(new UserId(userId));
+  const user = await userRepository.findUserByEmail(email);
 
   if (!user) {
-    throw new Error("User not Found!");
+    throw new AppError(
+      "User with this email not found",
+      404,
+      "USER_NOT_FOUND"
+    );
   }
 
-  // check user already is a group member or not
-  const isGroupMember = await groupRepository.findGroupMember(
+  const existingMember = await groupRepository.findGroupMember(
     new GroupId(groupId),
-    new UserId(userId)
+    user.id
   );
 
-  if (isGroupMember) {
-    throw new Error("Group Member is already exist!");
+  if (existingMember) {
+    throw new AppError(
+      "User is already a group member",
+      409,
+      "MEMBER_ALREADY_EXISTS"
+    );
   }
 
   const groupMember = await groupRepository.addGroupMember({
     groupId: new GroupId(groupId),
-    userId: new UserId(userId),
+    userId: user.id,
     role:
       role && Object.values(GroupRole).includes(role as GroupRole)
         ? (role as GroupRole)

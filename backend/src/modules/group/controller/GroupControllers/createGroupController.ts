@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../../../../middleware/authMiddleware";
-import { createGroupService } from "../../services/groupService";
+import { AppError } from "../../../../errors/appError";
+import { createGroupService } from "../../services/GroupServices/createGroupService";
 
 interface CreateGroupBody {
   name: string;
@@ -8,21 +9,23 @@ interface CreateGroupBody {
 }
 
 export const createGroupController = async (
-  req: AuthRequest, 
-  res: Response
+  req: AuthRequest,
+  res: Response,
 ): Promise<void> => {
   try {
-    const { name, description } = req.body;
+    const { name, description } = req.body ?? {};
     const userId = req.userId;
 
     if (!name || !userId) {
       res.status(400).json({
-        message: "Missing required fields: name",
+        success: false,
+        message: "Missing required fields",
+        code: "Required fields",
       });
       return;
     }
 
-    const group = await createGroupService(name, description, userId);
+    const group = await createGroupService(name, description, userId!);
 
     res.status(201).json({
       success: true,
@@ -30,19 +33,21 @@ export const createGroupController = async (
       data: group,
     });
   } catch (error: any) {
-    console.error("Create Group Error:", error);
+    console.error("CreateGroupController Error:", error);
 
-    const message = error.message?.toLowerCase() || "";
-
-    if (message.includes("already")) {
-      res.status(409).json({ success: false, message: error.message });
+    if (error instanceof AppError) {
+      res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+        code: error.code,
+      });
       return;
     }
 
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
-      error: error.message,
+      code: "INTERNAL_SERVER_ERROR",
     });
   }
 };

@@ -28,7 +28,7 @@ router.post("/:groupId/members", addGroupMemberController);
 router.get("/:groupId/members/:userId", getGroupMemberController);
 
 // get all members of a group
-router.get("/:groupId", getAllGroupMembersController);
+router.get("/:groupId/members", getAllGroupMembersController);
 
 // update group
 router.patch("/:groupId", updateGroupController);

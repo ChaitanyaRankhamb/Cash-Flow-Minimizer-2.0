@@ -1,8 +1,8 @@
 import { Response } from "express";
-import { getGroupService } from "../../services/groupService";
 import { UserId } from "../../../../entities/user/UserId";
 import { GroupId } from "../../../../entities/group/GroupId";
 import { AuthRequest } from "../../../../middleware/authMiddleware";
+import { getGroupService } from "../../services/GroupServices/getGroupService";
 
 interface GetGroupQuery {
   groupId?: string;
@@ -20,7 +20,7 @@ export const getGroupController = async (
     const groupIdObj = groupId ? new GroupId(groupId) : undefined;
     const userIdObj = userId ? new UserId(userId) : undefined;
 
-    const groups = await getGroupService(groupIdObj, name, userIdObj);
+    const groups = await getGroupService(groupIdObj?.toString(), name, userIdObj?.toString());
 
     if (!groups || (Array.isArray(groups) && groups.length === 0)) {
       res.status(200).json({
