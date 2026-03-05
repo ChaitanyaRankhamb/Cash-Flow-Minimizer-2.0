@@ -40,7 +40,7 @@ export default function ExpensesPage() {
         name: expense.nameOfExpense,
         groupId: group.id,
         groupName: group.groupName,
-        paidBy: expense.paidByUserId,
+        paidBy: appData.dashboard.user.id === expense.paidByUserId ? "You" : appData.dashboard.user.username,
         amount: expense.totalAmount,
         yourShare: expense.splits.reduce((sum, s) => sum + s.share, 0), // adjust later if needed
         date: expense.createdAt,
