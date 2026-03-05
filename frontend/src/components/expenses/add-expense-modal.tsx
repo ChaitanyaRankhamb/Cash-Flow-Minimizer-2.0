@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+// groups are now sourced directly from the global app data store
+import { useAppDataStore } from '@/store/useAppDataStore';
+import { apiFetch } from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +30,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { X } from 'lucide-react';
 import { toast } from 'sonner';
 
 type SplitType = 'equal' | 'exact' | 'percentage';
@@ -38,19 +40,7 @@ interface Member {
   initials: string;
 }
 
-const MOCK_GROUPS = [
-  { id: '1', name: 'Summer Trip', members: ['Alice', 'Bob', 'Charlie', 'Diana'] },
-  { id: '2', name: 'Apartment Rent', members: ['Alice', 'Bob'] },
-  { id: '3', name: 'Dinner Club', members: ['Charlie', 'Diana', 'Eve'] },
-];
-
-const MOCK_MEMBERS: Member[] = [
-  { id: '1', name: 'Alice Johnson', initials: 'AJ' },
-  { id: '2', name: 'Bob Smith', initials: 'BS' },
-  { id: '3', name: 'Charlie Brown', initials: 'CB' },
-  { id: '4', name: 'Diana Prince', initials: 'DP' },
-  { id: '5', name: 'Eve Wilson', initials: 'EW' },
-];
+// members will be derived from the currently selected group
 
 interface AddExpenseModalProps {
   open: boolean;
@@ -69,7 +59,7 @@ interface AddExpenseModalProps {
 export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpenseModalProps) {
   const [expenseName, setExpenseName] = useState('');
   const [amount, setAmount] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedGroup, setSelectedGroup] = useState(''); // will hold group id
   const [paidBy, setPaidBy] = useState('1');
   const [splitType, setSplitType] = useState<SplitType>('equal');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(['1', '2']);
@@ -84,7 +74,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
   };
 
   const getSelectedMemberNames = () =>
-    MOCK_MEMBERS.filter((m) => selectedMembers.includes(m.id)).map((m) => m.name);
+    groupMembers.filter((m) => selectedMembers.includes(m.id)).map((m) => m.name);
 
   const calculateSplits = () => {
     const numAmount = parseFloat(amount) || 0;
@@ -126,32 +116,103 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
     selectedMembers.length > 0 &&
     (splitType === 'equal' || (splitType === 'exact' && isValidExact) || (splitType === 'percentage' && isValidPercentage));
 
+  // pull the list of groups from app data; provider no longer required
+  const groups = useAppDataStore((s) => s.appData?.groups.groups || []);
+  const currentUserId = useAppDataStore((s) => s.appData?.dashboard.user.id);
+  const setAppData = useAppDataStore((s) => s.setAppData);
+
+  // derive members for the selected group
+  const groupMembers: Member[] = React.useMemo(() => {
+    if (!selectedGroup) return [];
+    const group = groups.find((g: any) => g.id === selectedGroup);
+    if (!group) return [];
+    return group.members.map((m: any) => ({
+      id: m.userId,
+      name: m.username,
+      initials: m.username
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase(),
+    }));
+  }, [selectedGroup, groups]);
+
+  // whenever the selected group changes, reset dependent values
+  React.useEffect(() => {
+    if (groupMembers.length > 0) {
+      setSelectedMembers(groupMembers.map((m) => m.id));
+      setPaidBy(currentUserId && groupMembers.some((m) => m.id === currentUserId)
+        ? currentUserId
+        : groupMembers[0].id);
+    } else {
+      setSelectedMembers([]);
+      setPaidBy('');
+    }
+  }, [groupMembers, currentUserId]);
+
   const handleSubmit = async () => {
     if (!isFormValid) return;
 
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
-      // Create new expense object
+      // calculate splits now so we can build the request body
+      const splits = calculateSplits();
+
+      // call backend with minimal payload
+      const body = {
+        title: expenseName,
+        totalAmount: parseFloat(amount),
+        splitType,
+        splits: Object.entries(splits).map(([memberId, val]) => ({
+          userId: memberId,
+          value: val,
+        })),
+      };
+
+      if (selectedGroup) {
+        const res = await apiFetch(
+          `http://localhost:4000/groups/${selectedGroup}/expenses`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+
+        if (!res?.ok) {
+          const data = await res?.json().catch(() => null);
+          throw new Error(data?.message || 'Failed to create expense');
+        }
+
+        // refresh app data
+        const refresh = await apiFetch('http://localhost:4000/app-data', {
+          method: 'GET',
+        });
+        const json = await refresh.json();
+        if (refresh.ok && json.success) {
+          setAppData(json.data);
+        }
+      }
+
+      // prepare local object to show right away
       const newExpense = {
         name: expenseName,
-        group: MOCK_GROUPS.find((g) => g.id === selectedGroup)?.name || '',
-        paidBy: MOCK_MEMBERS.find((m) => m.id === paidBy)?.name || '',
+        group: groups.find((g: any) => g.id === selectedGroup)?.groupName || '',
+        paidBy: groupMembers.find((m) => m.id === paidBy)?.name || '',
         amount: parseFloat(amount),
         yourShare: splits['1'] || 0,
         date: new Date().toISOString().split('T')[0],
         status: 'pending' as const,
       };
 
-      // Call parent callback to add expense
       onAddExpense?.(newExpense);
-      
+
       toast.success('Expense added successfully');
       onOpenChange(false);
       resetForm();
     } catch (error) {
       toast.error('Failed to add expense');
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -173,6 +234,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
     onOpenChange(false);
   };
 
+  // compute splits once per render for display sections
   const splits = calculateSplits();
   const yourShare = splits['1'] || 0;
 
@@ -207,7 +269,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
                 <Label htmlFor="amount">Amount *</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
+                    Rs
                   </span>
                   <Input
                     id="amount"
@@ -229,9 +291,9 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
                     <SelectValue placeholder="Select group" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_GROUPS.map((group) => (
+                    {(groups as any[]).map((group) => (
                       <SelectItem key={group.id} value={group.id}>
-                        {group.name}
+                        {group.groupName || 'Unnamed'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -246,7 +308,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MOCK_MEMBERS.map((member) => (
+                  {groupMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
                       {member.name}
                     </SelectItem>
@@ -293,7 +355,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-80 max-h-48">
-                {MOCK_MEMBERS.map((member) => (
+                {groupMembers.map((member) => (
                   <DropdownMenuCheckboxItem
                     key={member.id}
                     checked={selectedMembers.includes(member.id)}
@@ -323,7 +385,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
             {splitType === 'equal' && (
               <div className="space-y-2">
                 {selectedMembers.map((memberId) => {
-                  const member = MOCK_MEMBERS.find((m) => m.id === memberId);
+                  const member = groupMembers.find((m) => m.id === memberId);
                   const share = splits[memberId];
                   return (
                     <div key={memberId} className="flex justify-between text-sm p-2 bg-secondary/30 rounded-lg">
@@ -338,7 +400,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
             {splitType === 'exact' && (
               <div className="space-y-3">
                 {selectedMembers.map((memberId) => {
-                  const member = MOCK_MEMBERS.find((m) => m.id === memberId);
+                  const member = groupMembers.find((m) => m.id === memberId);
                   return (
                     <div key={memberId} className="flex items-center gap-3">
                       <span className="text-sm text-muted-foreground min-w-fit">{member?.name}</span>
@@ -378,7 +440,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
             {splitType === 'percentage' && (
               <div className="space-y-3">
                 {selectedMembers.map((memberId) => {
-                  const member = MOCK_MEMBERS.find((m) => m.id === memberId);
+                  const member = groupMembers.find((m) => m.id === memberId);
                   const share = splits[memberId];
                   return (
                     <div key={memberId} className="flex items-center gap-3">
@@ -425,7 +487,7 @@ export function AddExpenseModal({ open, onOpenChange, onAddExpense }: AddExpense
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Paid By</span>
                 <span className="font-medium text-foreground">
-                  {MOCK_MEMBERS.find((m) => m.id === paidBy)?.name || 'You'}
+                  {groupMembers.find((m) => m.id === paidBy)?.name || 'You'}
                 </span>
               </div>
               <div className="border-t border-border pt-2 flex justify-between text-sm">
