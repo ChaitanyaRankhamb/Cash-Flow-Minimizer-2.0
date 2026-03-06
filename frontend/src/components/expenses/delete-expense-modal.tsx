@@ -109,7 +109,7 @@ export function DeleteExpenseModal({
         <Card className="p-3 bg-muted/40 border-border/50 flex items-start gap-3">
           <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Only expense members can delete this expense.
+            Only expense creator can delete this expense.
           </p>
         </Card>
 
