@@ -2,6 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../../../../middleware/authMiddleware";
 import { AppError } from "../../../../errors/appError";
 import { createGroupService } from "../../services/GroupServices/createGroupService";
+import redisClient from "../../../../config/redis-connection";
 
 interface CreateGroupBody {
   name: string;
@@ -26,6 +27,11 @@ export const createGroupController = async (
     }
 
     const group = await createGroupService(name, description, userId!);
+
+    // after creating a group, delete the dashboard data cache
+    if (group) {
+       await redisClient.del(`dashboard:user:${userId}`);
+    }
 
     res.status(201).json({
       success: true,

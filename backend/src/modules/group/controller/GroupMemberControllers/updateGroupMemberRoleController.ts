@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { updateGroupMemberRoleService } from "../../services/GroupMemberServices/updateGroupMemberRoleService";
+import redisClient from "../../../../config/redis-connection";
 
 type GroupMemberParams = {
   groupId: string;
@@ -12,7 +13,7 @@ interface UpdateGroupMemberRoleBody {
 
 export const updateGroupMemberRoleController = async (
   req: Request<GroupMemberParams, {}, UpdateGroupMemberRoleBody>,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { groupId, userId } = req.params;
@@ -28,8 +29,11 @@ export const updateGroupMemberRoleController = async (
     const updatedMember = await updateGroupMemberRoleService(
       groupId,
       userId,
-      role
+      role,
     );
+
+    // delete app data cache after member removation
+    if (updatedMember) await redisClient.del(`dashboard:user:${userId}`);
 
     res.status(200).json({
       message: "Group member role updated successfully",

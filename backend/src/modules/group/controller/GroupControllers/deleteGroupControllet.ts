@@ -4,6 +4,7 @@ import { AppError } from "../../../../errors/appError";
 import { GroupId } from "../../../../entities/group/GroupId";
 import { deleteGroupService } from "../../services/GroupServices/deleteGroupService";
 import { UserId } from "../../../../entities/user/UserId";
+import redisClient from "../../../../config/redis-connection";
 
 export const deleteGroupController = async (
   req: AuthRequest,
@@ -24,6 +25,9 @@ export const deleteGroupController = async (
     }
 
     await deleteGroupService(new GroupId(groupId.toString()), new UserId(userId));
+
+    // after deleting the group, delete the app data cache
+    await redisClient.del(`dashboard:user:${userId}`);
 
     res.status(200).json({
       success: true,

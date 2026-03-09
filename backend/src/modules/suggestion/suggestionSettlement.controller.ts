@@ -4,10 +4,11 @@ import { GroupId } from "../../entities/group/GroupId";
 import { UserId } from "../../entities/user/UserId";
 import { SuggestionId } from "../../entities/settled/SuggestionId";
 import { ConfirmSettlementService } from "./suggestionSettlement.service";
+import redisClient from "../../config/redis-connection";
 
 export const ConfirmSuggestionSettlementController = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     // check user validation
@@ -30,10 +31,15 @@ export const ConfirmSuggestionSettlementController = async (
       return;
     }
 
+    const { paymentMethod } = (req.body ?? {}) as { paymentMethod?: string };
+    // default to 'cash' when frontend does not provide a payment method
+    const finalPaymentMethod = paymentMethod ?? "cash";
+
     const settlement = await ConfirmSettlementService(
       new GroupId(groupId.toString()),
       new SuggestionId(suggestionId as string),
-      new UserId(req.userId)
+      new UserId(req.userId),
+      finalPaymentMethod,
     );
 
     if (!settlement) {
@@ -42,6 +48,9 @@ export const ConfirmSuggestionSettlementController = async (
       });
       return;
     }
+
+    // delete app data cache after suggestion settled
+    if (settlement) await redisClient.del(`dashboard:user:${req.userId}`);
 
     res.status(201).json({
       message: "Suggestion settled successfully",
@@ -59,7 +68,7 @@ export const ConfirmSuggestionSettlementController = async (
         res.status(403).json({ message: error.message });
         return;
 
-      case "SuggestionsNotFoundError":
+      case "SuggestionNotFoundError":
         res.status(404).json({ message: error.message });
         return;
 

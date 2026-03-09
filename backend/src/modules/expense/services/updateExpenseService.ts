@@ -1,178 +1,205 @@
 import { expenseRepository } from "../../../database/mongo/expense/expenseRepository";
 import { expenseSplitRepository } from "../../../database/mongo/expense/expenseSplitRepository";
 import { groupRepository } from "../../../database/mongo/group/groupRepository";
+import { userRepository } from "../../../database/mongo/user/userRepository";
 import { Expense } from "../../../entities/expense/Expense";
 import { ExpenseId } from "../../../entities/expense/ExpenseId";
 import { UpdateExpenseData } from "../../../entities/expense/ExpenseRepository";
 import { CreateExpenseSplitData } from "../../../entities/expense/ExpenseSplitRepository";
 import { GroupId } from "../../../entities/group/GroupId";
 import { UserId } from "../../../entities/user/UserId";
+import { AppError } from "../../../errors/appError";
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-export const updateExpenseService = async ({
-  groupId,
-  expenseId,
-  requesterId,
-  payload,
-}: {
-  groupId: string;
-  expenseId: string;
-  requesterId: string;
-  payload: UpdateExpenseData;
-}): Promise<Expense> => {
-  // total amount validation
-  if (typeof payload.totalAmount !== "number" || payload.totalAmount <= 0) {
-    throw Object.assign(new Error("Total amount must be positive"), {
-      name: "ValidationError",
+export const updateExpenseService = async (
+  groupId: GroupId,
+  requesterId: UserId,
+  expenseId: ExpenseId,
+  payload: UpdateExpenseData,
+): Promise<Expense> => {
+  try {
+
+    console.log("payload", payload);
+    
+    // user validation
+    const user = await userRepository.findUserByID(requesterId);
+    if (!user) {
+      throw new AppError("User not found", 404, "USER_NOT_FOUND");
+    }
+
+    // group validation
+    const group = await groupRepository.findGroupById(groupId);
+    if (!group) {
+      throw new AppError("Group not found", 404, "GROUP_NOT_FOUND");
+    }
+
+    // expense validation
+    const expense = await expenseRepository.getExpenseById(expenseId);
+    if (!expense) {
+      throw new AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
+    }
+
+    // expense updater must be expense payer (creator)
+    if (expense.paidBy.toString() !== requesterId.toString()) {
+      throw new AppError(
+        "Only the expense creator can update the expense",
+        403,
+        "FORBIDDEN",
+      );
+    }
+
+    // if totalAmount is being updated, it must be positive
+    if (typeof payload.totalAmount !== "number" || payload.totalAmount <= 0) {
+      throw new AppError(
+        "Total amount must be positive",
+        400,
+        "VALIDATION_ERROR",
+      );
+    }
+
+    // if splits are being updated, there must be at least one participant
+    if (!payload.splits || payload.splits.length === 0) {
+      throw new AppError(
+        "At least one participant is required",
+        400,
+        "VALIDATION_ERROR",
+      );
+    }
+
+    const groupMembers = await groupRepository.findAllGroupMembers(groupId);
+
+    // all split members must be part of the group
+    if (groupMembers) {
+      payload.splits.forEach((s) => {
+        let isMember = false;
+
+        for (const member of groupMembers) {
+          if (member._userId.toString() === s.userId.toString()) {
+            isMember = true;
+          }
+        }
+
+        if (!isMember) {
+          throw new AppError(
+            "One of the split member is not the member of group",
+            400,
+            "VALIDATION_ERROR",
+          );
+        }
+      });
+    }
+
+    // split type validation
+    const splitType = String(payload.splitType);
+    if (!["equal", "percentage", "exact"].includes(splitType)) {
+      throw new AppError(
+        "Invalid split type", 
+        400, 
+        "VALIDATION_ERROR"
+      );
+    }
+
+    // update the expense
+    const updated = await expenseRepository.updateExpense({
+      ...payload,
+      expenseId,
+      groupId,
     });
-  }
 
-  //
-  if (!payload.splits?.length) {
-    throw Object.assign(new Error("At least one participant is required"), {
-      name: "ValidationError",
-    });
-  }
+    if (!updated) {
+      throw new AppError(
+        "Expense update failed", 
+        500, 
+        "INTERNAL_ERROR"
+      );
+    }
 
-  const gid = new GroupId(groupId);
-  const payerId = new UserId(requesterId);
-  const eid = new ExpenseId(expenseId);
+    // recreate new expense splits
+    if (payload.splits) {
+      await recreateSplits(
+        expenseId,
+        payload.splits,
+        payload.totalAmount,
+        splitType,
+      );
+    }
 
-  const expense = await expenseRepository.getExpenseById(eid);
-  if (!expense) {
-    throw Object.assign(new Error("Expense Not Found!"));
-  }
-
-  const groupMembers = await groupRepository.findAllGroupMembers(gid);
-  if (!groupMembers || groupMembers.length === 0) {
-    throw Object.assign(new Error("Group Not Found!"), {
-      name: "GroupNotFoundError",
-    });
-  }
-
-  // make split users id set
-  const splitMembersId = new Set(groupMembers.map((m) => m._userId.toString()));
-
-  // check payer is a member of group
-  if (!splitMembersId.has(payerId.toString())) {
-    throw Object.assign(new Error("You are not a member of this group"), {
-      name: "ForbiddenError",
-    });
-  }
-
-  // make invalid splits
-  const invalidSplits = payload.splits.filter(
-    (s) => !splitMembersId.has(s.userId.toString())
-  );
-
-  if (invalidSplits.length > 0) {
-    throw Object.assign(
-      new Error("One or more split members are not the members of this group"),
-      {
-        name: "ValidationError",
-      }
+    return updated;
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error; // controller will handle it
+    }
+    throw new AppError(
+      "Internal Server Error", 
+      500, 
+      "INTERNAL_ERROR"
     );
   }
-
-  const splitType = String(payload.splitType);
-
-  if (
-    splitType !== "equal" &&
-    splitType !== "percentage" &&
-    splitType !== "exact"
-  ) {
-    throw Object.assign(new Error("Invalid split type"), {
-      name: "ValidationError",
-    });
-  }
-
-  const updated = await expenseRepository.updateExpense({
-    ...payload,
-    expenseId: eid,
-    groupId: gid,
-    splitType,
-  });
-
-  if (!updated) {
-    throw new Error("Expense update failed");
-  }
-
-  if (payload.splits && payload.splitType) {
-    await recreateSplits(
-      eid,
-      payload.splits,
-      payload.totalAmount ?? expense.totalAmount,
-      splitType,
-    );
-  }
-
-  return updated;
 };
 
+/* ========================================================= */
+/* ================= SPLIT RECREATION ====================== */
+/* ========================================================= */
 const recreateSplits = async (
   expenseId: ExpenseId,
   splits: any[],
   totalAmount: number,
-  splitType: any,
+  splitType: string,
 ) => {
+  // delete existing splits
   await expenseSplitRepository.deleteExpenseSplits(expenseId);
 
   const toCreate: CreateExpenseSplitData[] = [];
 
-  if (splitType === "equal") {
+  // for equal splits
+  if (splitType === "equal" || splitType === "percentage") {
     const base = round2(totalAmount / splits.length);
     let remainder = round2(totalAmount);
 
-    splits.forEach((s, i) => {
-      const amount = i === splits.length - 1 ? remainder : base;
-      remainder = round2(remainder - amount);
-
+    splits.forEach((s,i) => {
+      const amount = (i === splits.length - 1) ? remainder : base;
+      remainder = round2(remainder - base);
       toCreate.push({ expenseId, userId: s.userId, amount });
     });
   }
 
-  if (splitType.percentage) {
-    const sum = splits.reduce((t, s) => t + (s.value ?? 0), 0);
-    if (sum !== 100) {
-      throw Object.assign(new Error("Total percentage must be 100"), {
-        name: "ValidationError",
-      });
-    }
+  // if (splitType === "percentage") {
+  //   const sum = splits.reduce((t, s) => t + (s.value ?? 0), 0);
+  //   if (sum !== 100)
+  //     throw new AppError(
+  //       "Total percentage must equal 100",
+  //       400,
+  //       "VALIDATION_ERROR",
+  //     );
 
-    let remainder = round2(totalAmount);
+  //   let remainder = round2(totalAmount);
+  //   splits.forEach((s, i) => {
+  //     const amount =
+  //       i === splits.length - 1
+  //         ? remainder
+  //         : round2((totalAmount * s.value) / 100);
+  //     remainder = round2(remainder - amount);
+  //     toCreate.push({
+  //       expenseId,
+  //       userId: s.userId,
+  //       amount,
+  //       percentage: s.value,
+  //     });
+  //   });
+  // }
 
-    splits.forEach((s, i) => {
-      const amount =
-        i === splits.length - 1
-          ? remainder
-          : round2((totalAmount * s.value) / 100);
-
-      remainder = round2(remainder - amount);
-
-      toCreate.push({
-        expenseId,
-        userId: s.userId,
-        amount,
-        percentage: s.value,
-      });
-    });
-  }
-
-  if (splitType.exact) {
+  if (splitType === "exact") {
     const sum = round2(splits.reduce((t, s) => t + s.value, 0));
-    if (sum !== round2(totalAmount)) {
-      throw Object.assign(new Error("Exact split total mismatch"), {
-        name: "ValidationError",
-      });
-    }
+    if (sum !== round2(totalAmount))
+      throw new AppError(
+    "Exact split total mismatch", 
+    400, 
+    "VALIDATION_ERROR"
+  );
 
     splits.forEach((s) =>
-      toCreate.push({
-        expenseId,
-        userId: s.userId,
-        amount: round2(s.value),
-      }),
+      toCreate.push({ expenseId, userId: s.userId, amount: round2(s.value) }),
     );
   }
 

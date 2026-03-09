@@ -2,13 +2,15 @@ import { CreateExpenseData } from "../../../entities/expense/ExpenseRepository";
 import { AuthRequest } from "../../../middleware/authMiddleware";
 import { Response } from "express";
 import { createExpenseService } from "../services/createExpenseService";
+import { emitWarning } from "process";
+import redisClient from "../../../config/redis-connection";
 
 export const createExpenseController = async (
   req: AuthRequest & {
     params: { groupId: string };
     body: Omit<CreateExpenseData, "groupId" | "paidBy">;
   },
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     if (!req.userId) {
@@ -21,6 +23,9 @@ export const createExpenseController = async (
       paidBy: req.userId,
       payload: req.body,
     });
+
+    // delete app data cache after expense creation
+    if (result) await redisClient.del(`dashboard:user:${req.userId}`);
 
     res.status(201).json({
       message: "Expense created successfully",
@@ -39,7 +44,9 @@ export const createExpenseController = async (
         break;
 
       case "ValidationError":
-        res.status(400).json({ message: error.message, details: error.details });
+        res
+          .status(400)
+          .json({ message: error.message, details: error.details });
         break;
 
       default:

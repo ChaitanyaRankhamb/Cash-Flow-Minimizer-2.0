@@ -4,6 +4,7 @@ import { AppError } from "../../../../errors/appError";
 import { GroupId } from "../../../../entities/group/GroupId";
 import { updateGroupService } from "../../services/GroupServices/updateGroupService";
 import { UserId } from '../../../../entities/user/UserId';
+import redisClient from '../../../../config/redis-connection';
 
 interface UpdateGroupBody {
   name?: string;
@@ -46,6 +47,11 @@ export const updateGroupController = async (
       new GroupId(groupId.toString()),
       payload,
     );
+
+    // delete app data cache after group updation
+    if (updatedGroup) {
+      await redisClient.del(`dashboard:user:${userId}`);
+    }
 
     res.status(200).json({
       success: true,

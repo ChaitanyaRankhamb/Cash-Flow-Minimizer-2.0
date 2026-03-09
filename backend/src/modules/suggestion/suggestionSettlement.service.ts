@@ -12,8 +12,10 @@ import { settlementRepository } from "../../database/mongo/settlement/settlement
 export const ConfirmSettlementService = async (
   groupId: GroupId,
   suggestionId: SuggestionId,
-  confirmedBy: UserId
+  confirmedBy: UserId,
+  paymentMethod: string
 ): Promise<Settlement | null> => {
+
   // check group exist with groupId
   const isGroup = await groupRepository.exists(groupId);
   if (!isGroup) {
@@ -35,7 +37,10 @@ export const ConfirmSettlementService = async (
     );
   }
 
-  const suggestion = await suggestionRepository.getSuggestionById(suggestionId);
+  const suggestion = await suggestionRepository.getSuggestionByIdAndGroup(new GroupId(groupId.toString()), new SuggestionId(suggestionId.toString()));
+
+  console.log(suggestion);
+  console.log(groupId, suggestionId);
 
   //suggestion validation
   if (!suggestion) {
@@ -83,6 +88,7 @@ export const ConfirmSettlementService = async (
     whom: suggestion.whom,
     amount: suggestion.amount,
     confirmedBy,
+    paymentMethod,
   });
 
   if (!settlement) {

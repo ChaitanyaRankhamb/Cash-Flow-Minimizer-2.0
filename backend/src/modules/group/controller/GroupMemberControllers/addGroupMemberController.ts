@@ -3,14 +3,25 @@ import { addGroupMemberService } from "../../services/GroupMemberServices/addGro
 import { AuthRequest } from "../../../../middleware/authMiddleware";
 import { GroupId } from "../../../../entities/group/GroupId";
 import { AppError } from "../../../../errors/appError";
+import redisClient from "../../../../config/redis-connection";
 
 export const addGroupMemberController = async (
   req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
+    const userId = req.userId;
     const { groupId } = req.params;
     const { email, role } = req.body ?? {};
+
+    if (!userId) {
+      res.status(400).json({
+        success: false,
+        message: "User Not Found!",
+        code: "UnAuthorized",
+      });
+      return;
+    }
 
     if (!groupId || !email) {
       res.status(400).json({
@@ -22,6 +33,11 @@ export const addGroupMemberController = async (
     }
 
     const member = await addGroupMemberService(groupId.toString(), email, role);
+
+    // delete app data cache after member creation
+    if (member) {
+      await redisClient.del(`dashboard:user:${userId}`);
+    }
 
     res.status(201).json({
       success: true,

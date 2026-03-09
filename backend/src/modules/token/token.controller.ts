@@ -1,9 +1,13 @@
 import jwt from "jsonwebtoken";
 import redisClient from "../../config/redis-connection";
-import {Response, Request} from "express";
-import { JwtPayload, generateAccessToken, verifyRefreshToken } from "../../lib/jwt";
+import { Response, Request } from "express";
+import {
+  JwtPayload,
+  generateAccessToken,
+  verifyRefreshToken,
+} from "../../lib/jwt";
 
-export const refreshTokenHandler = async (req:Request, res:Response) => {
+export const refreshTokenHandler = async (req: Request, res: Response) => {
   const token = req.cookies?.refreshToken;
 
   if (!token) {
@@ -26,7 +30,11 @@ export const refreshTokenHandler = async (req:Request, res:Response) => {
       email: payload.email,
     });
 
-    return res.json({ accessToken: newAccessToken });
+    return res.json({
+      status: 201,
+      message: "Access Token Issue Successfully!",
+      accessToken: newAccessToken,
+    });
   } catch (err) {
     return res.status(401).json({ message: "Invalid refresh token" });
   }

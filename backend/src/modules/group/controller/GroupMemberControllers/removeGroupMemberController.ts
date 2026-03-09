@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { removeGroupMemberService } from "../../services/GroupMemberServices/removeGroupMemberService";
+import redisClient from "../../../../config/redis-connection";
 
 type GroupMemberParams = {
   groupId: string;
@@ -21,6 +22,9 @@ export const removeGroupMemberController = async (
     }
 
     await removeGroupMemberService(groupId, userId);
+
+    // delete app data cache after member removation
+    await redisClient.del(`dashboard:user:${userId}`);
 
     res.status(200).json({
       message: "Group member removed successfully",

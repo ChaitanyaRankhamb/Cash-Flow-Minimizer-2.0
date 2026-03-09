@@ -107,7 +107,7 @@ const recreateSplits = async (
 
   const toCreate: CreateExpenseSplitData[] = [];
 
-  if (splitType === "equal") {
+  if (splitType === "equal" || splitType === "percentage") {
     const base = round2(totalAmount / splits.length);
     let remainder = round2(totalAmount);
 
@@ -119,32 +119,32 @@ const recreateSplits = async (
     });
   }
 
-  if (splitType === "percentage") {
-    const sum = splits.reduce((t, s) => t + (s.value ?? 0), 0);
-    if (sum !== 100) {
-      throw Object.assign(new Error("Total percentage must be 100"), {
-        name: "ValidationError",
-      });
-    }
+  // if (splitType === "percentage") {
+  //   const sum = splits.reduce((t, s) => t + (s.value ?? 0), 0);
+  //   if (sum !== 100) {
+  //     throw Object.assign(new Error("Total percentage must be 100"), {
+  //       name: "ValidationError",
+  //     });
+  //   }
 
-    let remainder = round2(totalAmount);
+  //   let remainder = round2(totalAmount);
 
-    splits.forEach((s, i) => {
-      const amount =
-        i === splits.length - 1
-          ? remainder
-          : round2((totalAmount * s.value) / 100);
+  //   splits.forEach((s, i) => {
+  //     const amount =
+  //       i === splits.length - 1
+  //         ? remainder
+  //         : round2((totalAmount * s.value) / 100);
 
-      remainder = round2(remainder - amount);
+  //     remainder = round2(remainder - amount);
 
-      toCreate.push({
-        expenseId,
-        userId: s.userId,
-        amount,
-        percentage: s.value,
-      });
-    });
-  }
+  //     toCreate.push({
+  //       expenseId,
+  //       userId: s.userId,
+  //       amount,
+  //       percentage: s.value,
+  //     });
+  //   });
+  // }
 
   if (splitType === "exact") {
     const sum = round2(splits.reduce((t, s) => t + s.value, 0));

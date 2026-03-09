@@ -4,6 +4,7 @@ import { userRepository } from "../../database/mongo/user/userRepository";
 import { UserId } from "../../entities/user/UserId";
 import { appDataService } from "./services";
 import { CashFlowAppData, guestDefaultData } from "./types";
+import redisClient from "../../config/redis-connection";
 
 export const appDataController = async (
   req: AuthRequest,
@@ -11,6 +12,19 @@ export const appDataController = async (
 ): Promise<Response> => {
   try {
     const userId = req.userId;
+
+    // create a chace key for dashboard data/ app data
+    const dashboardChaceKey = `dashboard:user:${userId}`;
+
+    const dashboardChaceData = await redisClient.get(dashboardChaceKey);
+
+    if (dashboardChaceData) {
+      return res.status(200).json({
+        success: true,
+        message: "app data fetched successfully through chace",
+        data: JSON.parse(dashboardChaceData) as CashFlowAppData,
+      })
+    }
 
     // check userId existance
     if (!userId) {
@@ -32,7 +46,12 @@ export const appDataController = async (
       });
     }
 
-    const appdata: CashFlowAppData = await appDataService(new UserId(userId), res);
+    const appdata: CashFlowAppData = await appDataService(new UserId(userId));
+
+    // set appdata into redis 
+    redisClient.set(dashboardChaceKey, JSON.stringify(appdata), {
+      EX: 60, // 60 seconds
+    });
 
     return res.status(200).json({
       success: true,
