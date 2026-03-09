@@ -1,10 +1,9 @@
 import { UserId } from "../../entities/user/UserId";
 
-
 export interface CashFlowAppData {
   dashboard: {
     user: {
-      id: UserId | null;
+      id: string;
       username: string;
       profileImageUrl: string | null;
       email: string | null;
@@ -41,39 +40,57 @@ export interface CashFlowAppData {
     };
 
     groups: {
+      id: string;
+      description: string;
+
       groupName: string;
       groupStatus: "active" | "balanced";
-      membersCount: number;
-      memberList: string[];
 
-      // overview of the group
+      createdAt: Date;
+
+      members: {
+        userId: string;
+        username: string;
+        profileImageUrl?: string | null;
+      }[];
+
       overview: {
         totalExpensesAmount: number;
         yourNetBalance: number;
-        recentTransctionList : {
-          timeOfpaid: Date;
+        recentTransctionList: {
+          timeOfpaid: string; // ISO string
           transactionName: string;
           amount: number;
-        }[]
+        }[];
       };
 
-      // expenses reconrds of the group
       expenses: {
         expensesList: {
+          id: string;
+
           nameOfExpense: string;
-          paidBy: string; // username of paid member
-          amount: number;
-        }[]
+          paidByUserId: string;
+
+          totalAmount: number;
+          createdAt: string;
+
+          splits: {
+            userId: string;
+            share: number;
+          }[];
+        }[];
       };
 
-      // user settlement of the group
-      settlements: {
-        listOfSettelments: {
-          who: string; // payer username
-          whom: string // creditor username
+      suggestions: {
+        listOfSuggestions: {
+          id: string;
+          fromUserId: string;
+          toUserId: string;
           amount: number;
-        }[]
-      }
+          creditedAt: string; // ISO string
+          status: "pending" | "settled";
+        }[];
+      };
     }[];
   };
 
@@ -84,39 +101,44 @@ export interface CashFlowAppData {
       totalYouOwe: number;
     };
 
-    // expenses records of all user groups
     expenses: {
+      expenseId: string;
+      groupId: string;
+
       expenseName: string;
-      groupName: string;
-      paidBY: string; // payer's username
+      paidByUserId: string;
+
       totalAmount: number;
       userShare: number;
+
       status: "pending" | "settled";
       createdAt: string;
     }[];
   };
 
-  settlements: {
+  suggestions: {
     summary: {
       totalYouOwe: number;
       totalYouAreOwed: number;
       netPosition: number;
     };
 
-    settlementSuggestions: {
+    pending: {
+      id: string;
+      groupId: string;
       amount: number;
-      status: "pending";
-      from: string;  // debtor username
-      to: string; // creditor username
-      groupName: string; // settlement group name
-      creditedAt: Date; // date of settlement creation
+      status: "pending" | "settled";
+      fromUserId: string;
+      toUserId: string;
+      creditedAt: string;
     }[];
 
-    settlementHistory: {
-      who: string; // debtor username
-      whom: string; // creditor username
+    history: {
+      id: string;
+      whoUserId: string;
+      whomUserId: string;
       amount: number;
-      settledAt: Date; // date of settlement
+      settledAt: string;
     }[];
   };
 }
@@ -124,17 +146,17 @@ export interface CashFlowAppData {
 export const guestDefaultData: CashFlowAppData = {
   dashboard: {
     user: {
-      id: null,
+      id: "",
       username: "Guest",
       profileImageUrl: null,
-      email: "useremailaddress@gmail.com"
+      email: null,
     },
 
     globalFinancialOverview: {
       totalGroupsJoined: 0,
       totalExpensesRecorded: 0,
       totalPendingSettlements: 0,
-      totalSettledTransactions: 0
+      totalSettledTransactions: 0,
     },
 
     debtStatus: {
@@ -143,110 +165,41 @@ export const guestDefaultData: CashFlowAppData = {
       youOwe: 0,
       youAreOwed: 0,
       balancedGroups: 0,
-      netPosition: 0
+      netPosition: 0,
     },
 
     optimizationStats: {
       totalNaiveTransactions: 0,
       totalOptimizedTransactions: 0,
-      transactionsSaved: 0
-    }
+      transactionsSaved: 0,
+    },
   },
 
   groups: {
     header: {
       totalGroupsJoined: 0,
       youOwe: 0,
-      youAreOwed: 0
+      youAreOwed: 0,
     },
-
-    groups: [
-      {
-        groupName: "",
-        groupStatus: "active",
-        membersCount: 0,
-        memberList: [],
-
-        overview: {
-          totalExpensesAmount: 0,
-          yourNetBalance: 0,
-          recentTransctionList: [
-            {
-              timeOfpaid: new Date(0),
-              transactionName: "",
-              amount: 0
-            }
-          ]
-        },
-
-        expenses: {
-          expensesList: [
-            {
-              nameOfExpense: "",
-              paidBy: "",
-              amount: 0
-            }
-          ]
-        },
-
-        settlements: {
-          listOfSettelments: [
-            {
-              who: "",
-              whom: "",
-              amount: 0
-            }
-          ]
-        }
-      }
-    ]
+    groups: [],
   },
 
   expenses: {
     header: {
       totalExpenses: 0,
       totalYouPaid: 0,
-      totalYouOwe: 0
+      totalYouOwe: 0,
     },
-
-    expenses: [
-      {
-        expenseName: "",
-        groupName: "",
-        paidBY: "",
-        totalAmount: 0,
-        userShare: 0,
-        status: "pending",
-        createdAt: ""
-      }
-    ]
+    expenses: [],
   },
 
-  settlements: {
+  suggestions: {
     summary: {
       totalYouOwe: 0,
       totalYouAreOwed: 0,
-      netPosition: 0
+      netPosition: 0,
     },
-
-    settlementSuggestions: [
-      {
-        amount: 0,
-        status: "pending",
-        from: "",
-        to: "",
-        groupName: "",
-        creditedAt: new Date(0)
-      }
-    ],
-
-    settlementHistory: [
-      {
-        who: "",
-        whom: "",
-        amount: 0,
-        settledAt: new Date(0)
-      }
-    ]
-  }
+    pending: [],
+    history: [],
+  },
 };
