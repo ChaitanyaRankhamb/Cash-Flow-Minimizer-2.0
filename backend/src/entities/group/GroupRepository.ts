@@ -45,9 +45,11 @@ export interface GroupRepository {
 
   updateGroup(data: UpdateGroupData): Promise<Group>;
 
-  deleteGroup(groupId: GroupId): Promise<void>;
+  deleteGroup(groupId: GroupId): Promise<Group | null>;
 
   addGroupMember(data: AddGroupMemberData): Promise<GroupMember>;
+
+  findGroupMembersForUser(userId: UserId): Promise<GroupMember[] | null>;
 
   findGroupMember(
     groupId: GroupId,
