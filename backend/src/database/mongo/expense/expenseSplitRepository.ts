@@ -53,6 +53,7 @@ export class MongoExpenseSplitRepository implements IExpenseSplitRepository {
     const docs = await ExpenseSplitModel.find({
       expenseId: expenseId.toString(),
     });
+    console.log(docs);
     return docs.map(docToExpenseSplit);
   }
 

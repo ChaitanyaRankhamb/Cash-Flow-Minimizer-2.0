@@ -15,6 +15,7 @@ function docToExpense(doc: ExpenseDocument): Expense {
     new ExpenseId(doc._id.toString()),
     new GroupId(doc.groupId),
     new UserId(doc.paidBy),
+    new UserId(doc.createdBy),
     doc.title,
     doc.totalAmount,
     {
@@ -30,18 +31,33 @@ function docToExpense(doc: ExpenseDocument): Expense {
   );
 }
 
+// Helper function to safely extract splitType arrays from data (fixes linter error on discriminated union)
+function getSplitTypeFromData(splitType: any) {
+  // If it's a string, return an object with that key as an empty array (it will be populated by recreateSplits)
+  if (typeof splitType === "string") {
+    return {
+      [splitType]: [],
+    };
+  }
+
+  // If it's not an object, return all empty
+  if (typeof splitType !== "object" || splitType === null) return {};
+  return {
+    ...(Array.isArray(splitType.equal) ? { equal: splitType.equal } : {}),
+    ...(Array.isArray(splitType.exact) ? { exact: splitType.exact } : {}),
+    ...(Array.isArray(splitType.percentage) ? { percentage: splitType.percentage } : {}),
+  };
+}
+
 export class MongoExpenseRepository implements IExpenseRepository {
   async createExpense(data: CreateExpenseData): Promise<Expense> {
     const doc = await ExpenseModel.create({
       groupId: data.groupId.toString(),
       paidBy: data.paidBy.toString(),
+      createdBy: data.createdBy.toString(),
       title: data.title ?? "",
       totalAmount: data.totalAmount,
-      splitType: {
-        ...(data.splitType.equal !== undefined ? { equal: data.splitType.equal } : {}),
-        ...(data.splitType.exact !== undefined ? { exact: data.splitType.exact } : {}),
-        ...(data.splitType.percentage !== undefined ? { percentage: data.splitType.percentage } : {}),
-      },
+      splitType: getSplitTypeFromData(data.splitType),
       expenseDate: data.expenseDate ?? new Date(),
       notes: data.notes ?? "",
       isDeleted: false,
@@ -65,39 +81,50 @@ export class MongoExpenseRepository implements IExpenseRepository {
   async getExpenseByIdAndGroup(groupId: GroupId, expenseId: ExpenseId): Promise<Expense | null> {
     const doc = await ExpenseModel.findOne({
       groupId: groupId.toString(),
-      expressId: groupId.toString(),
+      _id: expenseId.toString(),
+    });
+    return doc ? docToExpense(doc) : null;
+  }
+
+  async getExpenseBynameAndGroup(groupId: GroupId, title: string): Promise<Expense | null> {
+    const doc = await ExpenseModel.findOne({
+      groupId: groupId.toString(),
+      title: title,
+      isDeleted: false,
     });
     return doc ? docToExpense(doc) : null;
   }
 
   async updateExpense(data: UpdateExpenseData): Promise<Expense | null> {
-      const doc = await ExpenseModel.findOneAndUpdate({
-        _id: data.expenseId.toString(),
-      }, {
-        ...(data.paidBy ? { paidBy: data.paidBy.toString() } : {}),
-        ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.totalAmount !== undefined ? { totalAmount: data.totalAmount } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.expenseDate !== undefined ? { expenseDate: data.expenseDate } : {}),
-        ...(data.notes !== undefined ? { notes: data.notes } : {}),
-        ...(data.splitType ? {
-          splitType: {
-            ...(data.splitType.equal !== undefined ? { equal: data.splitType.equal } : {}),
-            ...(data.splitType.exact !== undefined ? { exact: data.splitType.exact } : {}),
-            ...(data.splitType.percentage !== undefined ? { percentage: data.splitType.percentage } : {}),
-          }
-        } : {}),
-        updatedAt: new Date(),
-      });
-      return doc ? docToExpense(doc) : null;
+    const updateFields: Record<string, any> = {
+      updatedAt: new Date(),
+    };
+
+    if (data.paidBy) updateFields.paidBy = data.paidBy.toString();
+    if (data.createdBy) updateFields.createdBy = data.createdBy.toString();
+    if (data.title !== undefined) updateFields.title = data.title;
+    if (data.totalAmount !== undefined) updateFields.totalAmount = data.totalAmount;
+    if (data.description !== undefined) updateFields.description = data.description;
+    if (data.expenseDate !== undefined) updateFields.expenseDate = data.expenseDate;
+    if (data.notes !== undefined) updateFields.notes = data.notes;
+    if (data.splitType) {
+      updateFields.splitType = getSplitTypeFromData(data.splitType);
+    }
+
+    const doc = await ExpenseModel.findOneAndUpdate(
+      { _id: data.expenseId.toString() },
+      updateFields,
+      { new: true }
+    );
+    return doc ? docToExpense(doc) : null;
   }
 
   async deleteExpense(groupId: GroupId, expenseId: ExpenseId): Promise<Expense | null> {
-    const expense: Expense | null = await ExpenseModel.findOneAndDelete({
+    const doc = await ExpenseModel.findOneAndDelete({
       _id: expenseId.toString(),
       groupId: groupId.toString(),
     });
-    return expense;
+    return doc ? docToExpense(doc) : null;
   }
 }
 
