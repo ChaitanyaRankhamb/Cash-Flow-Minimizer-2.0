@@ -22,6 +22,8 @@ export const getExpensesByGroupController = async (
       groupId: e.groupId.toString(),
       title: e.title,
       amount: e.totalAmount,
+      paidBy: e.paidBy.toString(),
+      createdBy: e.createdBy.toString(),
       notes: e.notes ?? "",
       expenseDate: e.expenseDate,
     }));

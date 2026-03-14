@@ -3,12 +3,12 @@ import { AuthRequest } from "../../../middleware/authMiddleware";
 import { Response } from "express";
 import { createExpenseService } from "../services/createExpenseService";
 import { emitWarning } from "process";
-import redisClient from "../../../config/redis-connection";
+import redisClient from "../../../config/redis";
 
 export const createExpenseController = async (
   req: AuthRequest & {
     params: { groupId: string };
-    body: Omit<CreateExpenseData, "groupId" | "paidBy">;
+    body: Omit<CreateExpenseData, "groupId" | "createdBy">;
   },
   res: Response,
 ): Promise<void> => {
@@ -20,7 +20,7 @@ export const createExpenseController = async (
 
     const result = await createExpenseService({
       groupId: req.params.groupId,
-      paidBy: req.userId,
+      createdBy: req.userId,
       payload: req.body,
     });
 
