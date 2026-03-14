@@ -12,12 +12,12 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 export const createExpenseService = async ({
   groupId,
-  paidBy,
+  createdBy,
   payload,
 }: {
   groupId: string;
-  paidBy: string;
-  payload: Omit<CreateExpenseData, "groupId" | "paidBy">;
+  createdBy: string;
+  payload: Omit<CreateExpenseData, "groupId" | "createdBy">;
 }): Promise<Expense> => {
   // total amount validation
   if (payload.totalAmount <= 0) {
@@ -34,7 +34,7 @@ export const createExpenseService = async ({
   }
 
   const gid = new GroupId(groupId);
-  const payerId = new UserId(paidBy);
+  const payerId = new UserId(payload.paidBy.toString());
 
   const groupMembers = await groupRepository.findAllGroupMembers(gid);
   if (!groupMembers || groupMembers.length === 0) {
@@ -82,6 +82,7 @@ export const createExpenseService = async ({
   const expense = await expenseRepository.createExpense({
     ...payload,
     groupId: gid,
+    createdBy: new UserId(createdBy.toString()),
     paidBy: payerId,
     splitType,
   });

@@ -28,6 +28,14 @@ export const updateExpenseService = async (
       throw new AppError("User not found", 404, "USER_NOT_FOUND");
     }
 
+    // paid by validation (if being updated)
+    if (payload.paidBy) {
+      const paidByUser = await userRepository.findUserByID(payload.paidBy);
+      if (!paidByUser) {
+        throw new AppError("Paid by user not found", 404, "USER_NOT_FOUND");
+      }
+    }
+
     // group validation
     const group = await groupRepository.findGroupById(groupId);
     if (!group) {
@@ -40,8 +48,8 @@ export const updateExpenseService = async (
       throw new AppError("Expense not found", 404, "EXPENSE_NOT_FOUND");
     }
 
-    // expense updater must be expense payer (creator)
-    if (expense.paidBy.toString() !== requesterId.toString()) {
+    // expense updater must be expense creator
+    if (expense.createdBy.toString() !== requesterId.toString()) {
       throw new AppError(
         "Only the expense creator can update the expense",
         403,

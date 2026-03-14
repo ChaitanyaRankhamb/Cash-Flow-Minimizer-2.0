@@ -49,10 +49,10 @@ export const deleteExpenseService = async (
     );
   }
 
-  console.log("Deleting expense with ID:", expense.paidBy.toString());
+  console.log("Deleting expense with ID:", expense.createdBy.toString());
   console.log("User ID:", userId.toString());
 
-  if (expense.paidBy.toString() !== userId.toString()) {
+  if (expense.createdBy.toString() !== userId.toString()) {
     throw new AppError(
       "You are not authorized to delete this expense",
       403,
