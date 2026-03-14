@@ -8,6 +8,7 @@ export type SplitType = "equal" | "exact" | "percentage";
 export interface CreateExpenseData {
   groupId: GroupId;
   paidBy: UserId;
+  createdBy: UserId;
   title?: string,
   totalAmount: number;
   splitType: SplitType,
@@ -24,6 +25,7 @@ export interface UpdateExpenseData {
   expenseId: ExpenseId;
   groupId: GroupId,
   paidBy?: UserId;
+  createdBy?: UserId;
   title?: string;
   totalAmount?: number;
   splitType:SplitType,
@@ -44,6 +46,8 @@ export interface ExpenseRepository {
   getExpensesByGroup(groupId: GroupId): Promise<Expense[]>;
 
   getExpenseByIdAndGroup(groupId: GroupId, expenseId: ExpenseId): Promise<Expense | null>;
+
+  getExpenseBynameAndGroup(groupId: GroupId, title: string): Promise<Expense | null>;
 
   updateExpense(data: UpdateExpenseData) : Promise<Expense |null>;
 

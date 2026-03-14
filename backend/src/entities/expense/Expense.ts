@@ -13,6 +13,7 @@ export class Expense {
     public readonly _id: ExpenseId,
     public groupId: GroupId,
     public paidBy: UserId,
+    public createdBy: UserId,
     public title: string,
     public totalAmount: number,
     public splitType: SplitTypeData,
